@@ -1,0 +1,84 @@
+#include <windows.h>
+#include <iostream>
+#include <vector>
+
+struct ProcessInfo {
+    PROCESS_INFORMATION pi;
+    LPCSTR command;
+};
+
+void CloseProcessHandles(const ProcessInfo& process) {
+    CloseHandle(process.pi.hProcess);
+    CloseHandle(process.pi.hThread);
+}
+
+int main() {
+    const int NUM_PROCESSES = 3;
+    LPCSTR commands[NUM_PROCESSES] = {"notepad.exe", "calc.exe", "mspaint.exe"};
+    std::vector<ProcessInfo> processes;
+    HANDLE event = CreateEventA(NULL, TRUE, FALSE, "ParentEvent");
+
+    if (event == NULL) {
+        std::cerr << "Не вдалося створити подію. Код помилки: " << GetLastError() << std::endl;
+        return 1;
+    }
+
+    
+    for (int i = 0; i < NUM_PROCESSES; ++i) {
+        STARTUPINFO si = {0};
+        si.cb = sizeof(STARTUPINFO);
+        PROCESS_INFORMATION pi = {0};
+
+        if (!CreateProcessA(
+                NULL, (LPSTR)commands[i], NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi)) {
+            std::cerr << "Не вдалося створити процес " << commands[i] << ". Код помилки: " << GetLastError() << std::endl;
+            continue;
+        }
+
+        std::cout << "Процес " << commands[i] << " створено." << std::endl;
+        processes.push_back({pi, commands[i]});
+    }
+
+   
+    const DWORD TIMEOUT = 10000; // 10 секунд у мілісекундах
+    for (auto& process : processes) {
+        DWORD waitResult = WaitForSingleObject(process.pi.hProcess, TIMEOUT);
+
+        if (waitResult == WAIT_TIMEOUT) {
+            std::cerr << "Процес " << process.command << " виконується занадто довго. Завершуємо процес..." << std::endl;
+            if (!TerminateProcess(process.pi.hProcess, 1)) {
+                std::cerr << "Не вдалося завершити процес " << process.command << ". Код помилки: " << GetLastError() << std::endl;
+            } else {
+                std::cout << "Процес " << process.command << " завершено через перевищення часу." << std::endl;
+            }
+        } else if (waitResult == WAIT_FAILED) {
+            std::cerr << "Помилка очікування завершення процесу " << process.command << ". Код помилки: " << GetLastError() << std::endl;
+        } else {
+            DWORD exitCode;
+            if (!GetExitCodeProcess(process.pi.hProcess, &exitCode)) {
+                std::cerr << "Не вдалося отримати код завершення процесу " << process.command << ". Код помилки: " << GetLastError() << std::endl;
+            } else {
+                if (exitCode == 0) {
+                    std::cout << "Процес " << process.command << " успішно завершився. Код завершення: " << exitCode << std::endl;
+                } else {
+                    std::cerr << "Процес " << process.command << " завершився з помилкою. Код завершення: " << exitCode << std::endl;
+                }
+            }
+        }
+    }
+
+   
+    if (!SetEvent(event)) {
+        std::cerr << "Не вдалося встановити сигнал події. Код помилки: " << GetLastError() << std::endl;
+    } else {
+        std::cout << "Подія встановлена. Усі процеси синхронізовані." << std::endl;
+    }
+
+   
+    for (const auto& process : processes) {
+        CloseProcessHandles(process);
+    }
+
+    CloseHandle(event);
+    return 0;
+}
