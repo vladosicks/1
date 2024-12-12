@@ -1,0 +1,63 @@
+#include <windows.h>
+#include <iostream>
+
+int main() {
+ 
+    STARTUPINFO si = {0};
+    PROCESS_INFORMATION pi = {0};
+
+    si.cb = sizeof(STARTUPINFO);
+
+    
+    LPCSTR command = "notepad.exe";
+
+   
+    if (!CreateProcessA(
+            NULL,              
+            (LPSTR)command,    
+            NULL,              
+            NULL,              
+            FALSE,             
+            0,                 
+            NULL,              
+            NULL,             
+            &si,               
+            &pi)) {            
+        std::cerr << "Не вдалося створити процес. Код помилки: " << GetLastError() << std::endl;
+        return 1;
+    }
+
+    std::cout << "Дочірній процес створено. Очікуємо завершення..." << std::endl;
+
+    // Очікування завершення процесу
+    DWORD waitResult = WaitForSingleObject(pi.hProcess, INFINITE);
+
+    if (waitResult == WAIT_FAILED) {
+        std::cerr << "Помилка очікування завершення процесу. Код помилки: " << GetLastError() << std::endl;
+        CloseHandle(pi.hProcess);
+        CloseHandle(pi.hThread);
+        return 1;
+    }
+
+   
+    DWORD exitCode;
+    if (!GetExitCodeProcess(pi.hProcess, &exitCode)) {
+        std::cerr << "Не вдалося отримати код завершення процесу. Код помилки: " << GetLastError() << std::endl;
+        CloseHandle(pi.hProcess);
+        CloseHandle(pi.hThread);
+        return 1;
+    }
+
+    
+    if (exitCode == 0) {
+        std::cout << "Процес успішно завершився. Код завершення: " << exitCode << std::endl;
+    } else {
+        std::cerr << "Процес завершився з помилкою. Код завершення: " << exitCode << std::endl;
+    }
+
+    
+    CloseHandle(pi.hProcess);
+    CloseHandle(pi.hThread);
+
+    return 0;
+}
