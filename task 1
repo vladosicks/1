@@ -1,0 +1,45 @@
+#include <windows.h>
+#include <stdio.h>
+
+int main() {
+    // Структури для інформації про запуск процесу
+    STARTUPINFO si;
+    PROCESS_INFORMATION pi;
+
+    // Очищення структур
+    ZeroMemory(&si, sizeof(si));
+    ZeroMemory(&pi, sizeof(pi));
+
+    // Ініціалізація STARTUPINFO
+    si.cb = sizeof(STARTUPINFO);
+
+    // Створення процесу
+    if (CreateProcess(
+            L"C:\\Windows\\System32\\notepad.exe",  // Ім'я програми для запуску
+            NULL,                                  // Командний рядок (NULL означає без додаткових аргументів)
+            NULL,                                  // Безпеки процесу
+            NULL,                                  // Безпеки потоку
+            FALSE,                                 // Не успадковуємо дескриптори
+            0,                                     // Додаткові флаги створення процесу
+            NULL,                                  // Середовище (NULL означає використання поточного)
+            NULL,                                  // Поточний каталог (NULL для поточного)
+            &si,                                   // Інформація про запуск
+            &pi                                    // Інформація про створений процес
+        ) == 0) {
+        // Якщо CreateProcess не вдалося, виводимо помилку
+        printf("CreateProcess не вдалося, код помилки: %d\n", GetLastError());
+        return 1;
+    }
+
+    // Виведення інформації про створений процес
+    printf("Процес створено: PID = %d\n", pi.dwProcessId);
+
+    // Очікуємо завершення процесу
+    WaitForSingleObject(pi.hProcess, INFINITE);
+
+    // Закриваємо дескриптори
+    CloseHandle(pi.hProcess);
+    CloseHandle(pi.hThread);
+
+    return 0;
+}
